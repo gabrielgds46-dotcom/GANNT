@@ -6,28 +6,78 @@
 <title>Gerenciador de Projetos · Dengo</title>
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Firebase (compat SDK — funciona sem bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ===== Firebase config (Realtime Database) =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCIeJtAcHJkoSiY_MEpc3K8lefg8W3xvIw",
+  authDomain: "gannt-efeed.firebaseapp.com",
+  databaseURL: "https://gannt-efeed-default-rtdb.firebaseio.com",
+  projectId: "gannt-efeed",
+  storageBucket: "gannt-efeed.firebasestorage.app",
+  messagingSenderId: "424184613544",
+  appId: "1:424184613544:web:b99f6c1063df120f8a909d"
+};
+let fbDB = null, fbReady = false, fbError = '';
+
+function initFirebase(){
+  // 'firebase' é o global injetado pelos SDKs gstatic. Se foi bloqueado, não existe.
+  if(typeof firebase === 'undefined'){
+    fbError = 'SDK não carregou (script externo bloqueado neste ambiente)';
+    return false;
+  }
+  try {
+    if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    fbDB = firebase.database();
+    fbReady = true;
+    fbError = '';
+    console.log('[Firebase] ✅ conectado ao Realtime Database:', firebaseConfig.databaseURL);
+    return true;
+  } catch(e){
+    fbError = e?.message || String(e);
+    console.warn('[Firebase] ⚠ falha ao inicializar:', fbError);
+    return false;
+  }
+}
+
+// Tenta inicializar agora; se o SDK ainda não chegou, tenta de novo quando a página carregar
+initFirebase();
+if(!fbReady){
+  window.addEventListener('load', ()=>{ if(!fbReady) initFirebase(); });
+}
+</script>
 <style>
 /* ===== TOKENS ===== */
 :root{
-  --bg:#FFF9EE;
-  --s1:#FFF4DC;
-  --s2:#FDEDB8;
-  --s3:#F5E09A;
+  /* Fundos creme — sequência suave, sem ferir os olhos */
+  --bg:#FAF4E6;          /* creme principal (papel) */
+  --s1:#F2EAD5;          /* tom levemente mais quente para header de grupo */
+  --s2:#EADEC0;          /* linha de cabeçalho da tabela */
+  --s3:#DFCFA7;          /* faixa de meses, mais saturada para contraste */
+
+  /* Bordas e texto */
   --border:rgba(72,49,27,.10);
-  --border2:rgba(72,49,27,.20);
-  --text:#48311B;
+  --border2:rgba(72,49,27,.18);
+  --text:#3A2812;        /* marrom escuro Dengo, levemente mais profundo */
   --muted:#7A5C35;
-  --dim:#B8956A;
-  --accent:#FFA600;
-  --accent2:#FFD200;
+  --dim:#B89A6E;
+
+  /* Cores de marca Dengo (preservadas) */
+  --accent:#FFA600;      /* laranja Dengo (em andamento, destaque) */
+  --accent2:#F4C500;     /* amarelo Dengo levemente dessaturado (era FFD200) */
   --pink:#F1A6B5;
   --green:#286B37;
   --red-d:#E95C24;
   --brown:#48311B;
+
+  /* Aliases semânticos */
   --done:#286B37;
-  --prog:#FFA600;
-  --wait:#B8956A;
+  --prog:#E89400;        /* laranja levemente mais quente que o accent puro */
+  --wait:#B89A6E;
   --blok:#E95C24;
+
   --font:'Work Sans',sans-serif;
   --logo-dengo:url("data:image/png;base64,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");
 }
@@ -62,7 +112,7 @@ button{cursor:pointer;}
 .proj-id{font-size:10px;color:var(--dim);font-family:monospace;margin-bottom:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .proj-btns{display:flex;gap:6px;}
 .btn-new{background:transparent;border:2px dashed var(--accent2);border-radius:10px;padding:14px 20px;color:var(--brown);font-weight:500;font-size:13px;width:220px;text-align:center;transition:background .15s;}
-.btn-new:hover{background:rgba(255,210,0,.12);}
+.btn-new:hover{background:rgba(244,197,0,.12);}
 .hub-access{display:flex;gap:8px;}
 .hub-access input{padding:7px 12px;border:1.5px solid var(--border2);border-radius:6px;background:var(--s1);font-size:12px;color:var(--text);width:280px;}
 .hub-footer{font-size:11px;color:var(--dim);text-align:center;margin-top:16px;}
@@ -111,7 +161,7 @@ button{cursor:pointer;}
 .group-mini-fill{height:100%;border-radius:2px;}
 .group-pct{font-size:11px;font-weight:500;min-width:32px;text-align:right;}
 .group-btn{font-size:10px;font-weight:500;padding:3px 8px;border-radius:5px;border:none;cursor:pointer;}
-.group-add-btn{background:rgba(255,210,0,.18);border:1px solid rgba(255,210,0,.5);color:var(--brown);}
+.group-add-btn{background:rgba(244,197,0,.18);border:1px solid rgba(244,197,0,.5);color:var(--brown);}
 .group-del-btn{background:rgba(233,92,36,.10);border:1px solid rgba(233,92,36,.25);color:var(--red-d);}
 .collapse-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:2px 5px;color:var(--muted);transition:transform .2s;}
 .collapsed .collapse-btn{transform:rotate(-90deg);}
@@ -125,21 +175,28 @@ button{cursor:pointer;}
 .gantt-table{border-collapse:collapse;table-layout:fixed;width:auto;min-width:100%;font-size:11px;}
 .gantt-table th,.gantt-table td{border:1px solid var(--border);padding:0;white-space:nowrap;}
 .row-month th{background:var(--s3);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.8px;padding:3px 6px;text-align:center;color:var(--muted);}
-.row-fixed th{background:var(--s2);font-size:8px;font-weight:500;text-transform:uppercase;padding:4px 6px;color:var(--muted);}
-/* column widths */
-.col-task{width:180px;min-width:180px;}
-.col-prio{width:26px;min-width:26px;}
-.col-status{width:112px;min-width:112px;}
-.col-date{width:52px;min-width:52px;}
-.col-days{width:32px;min-width:32px;}
-.col-pct{width:88px;min-width:88px;}
-.col-resp{width:124px;min-width:124px;border-left:2px solid rgba(255,210,0,.4)!important;}
-.col-obs{width:170px;min-width:170px;border-left:2px solid rgba(40,107,55,.35)!important;}
-.col-alert{width:90px;min-width:90px;border-left:2px solid rgba(233,92,36,.35)!important;}
-.col-delayresp{width:110px;min-width:110px;border-left:2px solid rgba(233,92,36,.20)!important;}
-.col-del{width:28px;min-width:28px;}
+.row-fixed th{background:var(--s2);font-size:8px;font-weight:500;text-transform:uppercase;padding:4px 6px;color:var(--muted);position:relative;}
+/* column widths (defaults; overridable per cell via inline width) */
+.col-task{width:180px;min-width:60px;}
+.col-prio{width:26px;min-width:22px;}
+.col-status{width:112px;min-width:60px;}
+.col-date{width:52px;min-width:40px;}
+.col-days{width:32px;min-width:26px;}
+.col-pct{width:88px;min-width:60px;}
+.col-resp{width:124px;min-width:60px;border-left:2px solid rgba(244,197,0,.4)!important;}
+.col-obs{width:170px;min-width:60px;border-left:2px solid rgba(40,107,55,.35)!important;}
+.col-alert{width:90px;min-width:60px;border-left:2px solid rgba(233,92,36,.35)!important;}
+.col-delayresp{width:110px;min-width:70px;border-left:2px solid rgba(233,92,36,.20)!important;}
+.col-del{width:28px;min-width:24px;}
 .th-resp{color:#5C3A1A!important;}
 .th-obs{color:var(--done)!important;}
+
+/* Column resize handles */
+.col-resizer{position:absolute;right:-3px;top:0;width:6px;height:100%;cursor:col-resize;z-index:5;user-select:none;}
+.col-resizer:hover,.col-resizer.dragging{background:linear-gradient(90deg,transparent 0%,var(--accent) 30%,var(--accent) 70%,transparent 100%);}
+body.col-resizing{cursor:col-resize!important;user-select:none!important;}
+body.col-resizing *{cursor:col-resize!important;user-select:none!important;}
+.gantt-table th[data-col-key]{position:relative;}
 /* cells */
 td.cell-task{padding:5px 8px;position:relative;vertical-align:middle;}
 .task-name-inp{font-size:11px;border:none;background:transparent;outline:none;width:100%;border-bottom:1px dashed transparent;word-break:break-word;display:block;line-height:1.3;}
@@ -149,10 +206,10 @@ td.cell-prio{text-align:center;padding:4px;vertical-align:middle;}
 .prio-dot{width:10px;height:10px;border-radius:50%;display:inline-block;cursor:pointer;}
 td.cell-status{padding:2px 4px;vertical-align:middle;}
 .status-sel{border:none;background:transparent;font-size:10px;font-weight:500;outline:none;width:100%;padding:3px 6px;border-radius:4px;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center;}
-.s-done{background:rgba(40,107,55,.15);color:var(--done);}
-.s-prog{background:rgba(255,210,0,.22);color:var(--brown);}
-.s-wait{background:rgba(184,149,106,.15);color:var(--muted);}
-.s-blok{background:rgba(233,92,36,.15);color:var(--red-d);}
+.s-done{background:rgba(40,107,55,.14);color:var(--done);}
+.s-prog{background:rgba(232,148,0,.18);color:#8A5A00;}
+.s-wait{background:rgba(184,154,110,.20);color:var(--muted);}
+.s-blok{background:rgba(233,92,36,.14);color:var(--red-d);}
 td.cell-date{padding:2px 4px;text-align:center;vertical-align:middle;cursor:pointer;}
 .date-display{font-size:10px;color:var(--text);display:flex;align-items:center;justify-content:center;gap:3px;padding:2px 0;border-bottom:1px dashed transparent;line-height:1.2;}
 .date-display:hover{border-bottom-color:var(--accent);}
@@ -167,9 +224,9 @@ td.cell-pct{padding:4px 6px;vertical-align:middle;}
 .pct-fill{height:100%;border-radius:2px;}
 .pct-inp{border:none;background:transparent;font-size:10px;outline:none;width:100%;text-align:center;}
 .pct-inp:focus{border-bottom:1px solid var(--accent);}
-td.cell-resp{padding:4px 8px;border-left:2px solid rgba(255,210,0,.4)!important;cursor:pointer;vertical-align:middle;}
+td.cell-resp{padding:4px 8px;border-left:2px solid rgba(244,197,0,.4)!important;cursor:pointer;vertical-align:middle;}
 td.cell-obs{padding:4px 8px;border-left:2px solid rgba(40,107,55,.35)!important;cursor:pointer;vertical-align:middle;white-space:normal;}
-.chip-pill{background:var(--accent2);color:var(--brown);font-size:10px;font-weight:500;padding:3px 9px;border-radius:10px;display:inline-block;max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chip-pill{background:#F2C94C;color:#5C3A1A;font-size:10px;font-weight:500;padding:3px 9px;border-radius:10px;display:inline-block;max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .chip-assign,.obs-add{font-size:10px;color:var(--dim);}
 .obs-text{font-size:10px;color:var(--muted);white-space:normal;word-break:break-word;line-height:1.35;display:block;}
 td.cell-del{text-align:center;padding:2px;vertical-align:middle;}
@@ -182,7 +239,7 @@ td.cell-delayresp{padding:2px 4px;border-left:2px solid rgba(233,92,36,.20)!impo
 .badge-pendente{display:inline-block;color:var(--dim);font-size:9px;font-weight:300;}
 .delayresp-sel{border:none;background:transparent;font-size:10px;font-weight:500;outline:none;width:100%;padding:3px 4px;border-radius:4px;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center;color:var(--text);}
 .delayresp-zenatur{background:rgba(40,107,55,.12);color:var(--done);}
-.delayresp-dengo{background:rgba(255,210,0,.25);color:var(--brown);}
+.delayresp-dengo{background:rgba(244,197,0,.25);color:var(--brown);}
 .delayresp-empty{color:var(--dim);}
 .btn-del{background:transparent;border:1px solid rgba(233,92,36,.3);color:var(--red-d);font-size:11px;font-weight:500;padding:2px 5px;border-radius:4px;line-height:1;}
 .btn-del:hover{background:rgba(233,92,36,.1);}
@@ -192,7 +249,7 @@ td.cal-day{position:relative;padding:0;text-align:center;overflow:hidden;}
 th.cal-day-h{font-size:8px;padding:2px 0;text-align:center;min-width:20px;max-width:20px;width:20px;}
 th.cal-day-h.today-h{font-weight:600;color:var(--brown);background:var(--accent2)!important;}
 td.cal-day.weekend{background:rgba(72,49,27,.025);}
-td.cal-day.today-col{border-right:2px solid var(--accent2)!important;border-left:1px solid rgba(255,210,0,.5)!important;background:rgba(255,210,0,.13)!important;}
+td.cal-day.today-col{border-right:2px solid var(--accent2)!important;border-left:1px solid rgba(244,197,0,.5)!important;background:rgba(244,197,0,.13)!important;}
 .gantt-bar{position:absolute;top:50%;transform:translateY(-50%);height:11px;border-radius:3px;pointer-events:none;}
 .gantt-bar-late{position:absolute;top:50%;transform:translateY(-50%);height:11px;border-radius:0 3px 3px 0;pointer-events:none;background:repeating-linear-gradient(45deg,var(--red-d),var(--red-d) 4px,#C04A1A 4px,#C04A1A 8px);opacity:.85;box-shadow:0 0 0 1px rgba(0,0,0,.08);}
 
@@ -222,10 +279,10 @@ td.cal-day.today-col{border-right:2px solid var(--accent2)!important;border-left
 .color-swatch:hover,.color-swatch.sel{border-color:var(--text);transform:scale(1.15);}
 .tmpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
 .tmpl-card{border:1.5px solid var(--border2);border-radius:8px;padding:12px;cursor:pointer;text-align:center;transition:all .12s;}
-.tmpl-card:hover,.tmpl-card.sel{border-color:var(--accent2);background:rgba(255,210,0,.10);}
+.tmpl-card:hover,.tmpl-card.sel{border-color:var(--accent2);background:rgba(244,197,0,.10);}
 .col-type-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
 .col-type-card{border:1.5px solid var(--border2);border-radius:8px;padding:10px;cursor:pointer;text-align:center;transition:all .12s;}
-.col-type-card:hover,.col-type-card.sel{border-color:var(--accent2);background:rgba(255,210,0,.10);}
+.col-type-card:hover,.col-type-card.sel{border-color:var(--accent2);background:rgba(244,197,0,.10);}
 
 /* ===== PRESENTATION ===== */
 #present{position:fixed;inset:0;z-index:9000;background:var(--bg);display:none;flex-direction:column;}
@@ -321,8 +378,10 @@ body.cb-contrast    {--bg:#000;--s1:#111;--s2:#1A1A1A;--s3:#222;--border:rgba(25
       <div class="tb-sep"></div>
       <div class="tb-group">
         <button class="btn btn-ghost" id="tb-share">🔗 Compartilhar</button>
+        <button class="btn btn-ghost" id="tb-diag" title="Testar conexão Firebase">🔌 Conexão</button>
         <button class="btn btn-ghost" id="tb-pin">🔑 PIN</button>
         <button class="btn btn-ghost" id="tb-a11y" title="Modo daltônico">👁 Daltonismo</button>
+        <button class="btn btn-ghost" id="tb-reset-cols" title="Resetar larguras das colunas">↔ Colunas</button>
       </div>
       <div class="tb-sep"></div>
       <div class="tb-group">
@@ -424,7 +483,8 @@ let state = {
   groupFilter: 'all',
   dirty: false,
   syncTimer: null,
-  lastHash: '',
+  pushTimer: null,
+  lastPulledVersion: 0,
   prioTaskId: null,
   floatTaskId: null,
   floatField: null,
@@ -434,8 +494,110 @@ let state = {
   selColType: 'text',
   selTmpl: 'blank',
   pinAttempts: 0,
-  pinBlocked: false
+  pinBlocked: false,
+  colWidths: (()=>{ try{ return JSON.parse(localStorage.getItem('dengo_col_widths')||'{}'); }catch(e){ return {}; } })()
 };
+
+const COL_DEFAULTS = {task:180,prio:26,status:112,inicio:52,fim:52,conc:52,days:32,pct:88,resp:124,obs:170,alert:90,delayresp:110,del:28};
+const COL_MIN = {task:60,prio:22,status:60,inicio:40,fim:40,conc:40,days:26,pct:60,resp:60,obs:60,alert:60,delayresp:70,del:24,'extra:':60};
+
+function getColMin(key){
+  if(key.startsWith('extra:')) return COL_MIN['extra:'];
+  return COL_MIN[key]||40;
+}
+function saveColWidths(){
+  try{ localStorage.setItem('dengo_col_widths',JSON.stringify(state.colWidths)); }catch(e){}
+}
+function resetAllColWidths(){
+  state.colWidths = {};
+  saveColWidths();
+  applyColWidths();
+  toast('Larguras das colunas resetadas.');
+}
+
+// CSS-safe identifier (used as part of selectors and data attrs)
+function tableIdFor(gname){
+  // simple slug — preserves uniqueness, removes anything that breaks attribute selectors
+  return 'tbl_' + gname.replace(/[^a-zA-Z0-9_]/g,'_').toLowerCase();
+}
+
+function applyColWidths(){
+  // Build per-table-id CSS rules — each Gantt table (one per group) is independent
+  let css='';
+  for(const tableId in state.colWidths){
+    const cols = state.colWidths[tableId];
+    if(!cols) continue;
+    for(const key in cols){
+      const w = cols[key];
+      // Target only descendants of the specific table-id
+      const colSel = `[data-col-key="${key.replace(/"/g,'\\"')}"]`;
+      css += `.gantt-table[data-table-id="${tableId}"] ${colSel}{width:${w}px!important;min-width:${w}px!important;max-width:${w}px!important;}\n`;
+    }
+  }
+  let styleEl = document.getElementById('col-widths-style');
+  if(!styleEl){
+    styleEl = document.createElement('style');
+    styleEl.id = 'col-widths-style';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = css;
+}
+
+function installResizers(){
+  document.querySelectorAll('.gantt-table th[data-col-key]').forEach(th=>{
+    if(th.querySelector('.col-resizer')) return; // already installed
+    const table = th.closest('.gantt-table');
+    const tableId = table?.dataset.tableId;
+    if(!tableId) return;
+
+    const handle = document.createElement('div');
+    handle.className = 'col-resizer';
+    handle.title = 'Arraste para redimensionar · Duplo-clique para resetar';
+    th.appendChild(handle);
+
+    // Drag to resize — only this table's column
+    handle.addEventListener('mousedown', e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const key = th.dataset.colKey;
+      const startX = e.clientX;
+      const startW = th.getBoundingClientRect().width;
+      const min = getColMin(key);
+      handle.classList.add('dragging');
+      document.body.classList.add('col-resizing');
+
+      if(!state.colWidths[tableId]) state.colWidths[tableId] = {};
+
+      const onMove = ev=>{
+        const newW = Math.max(min, Math.round(startW + (ev.clientX - startX)));
+        state.colWidths[tableId][key] = newW;
+        applyColWidths();
+      };
+      const onUp = ()=>{
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        handle.classList.remove('dragging');
+        document.body.classList.remove('col-resizing');
+        saveColWidths();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Double-click to reset just this column of this table
+    handle.addEventListener('dblclick', e=>{
+      e.preventDefault(); e.stopPropagation();
+      const key = th.dataset.colKey;
+      if(state.colWidths[tableId]){
+        delete state.colWidths[tableId][key];
+        if(Object.keys(state.colWidths[tableId]).length===0) delete state.colWidths[tableId];
+      }
+      applyColWidths();
+      saveColWidths();
+      toast('Largura resetada');
+    });
+  });
+}
 
 // =============================================
 // UTILS
@@ -452,37 +614,145 @@ const getDelay = t => {
   if(t.status!=='REALIZADO' || !t.conc || !t.fim) return 0;
   return Math.max(0, Math.round((new Date(t.conc) - new Date(t.fim)) / 86400000));
 };
+
+// Ordena tarefas in-place: por grupo, depois por data de início (mais antiga primeiro),
+// depois por data de fim, depois por id como desempate estável
+function sortTasks(p){
+  if(!p || !p.tasks) return;
+  p.tasks.sort((a,b)=>{
+    // 1. Mesmo grupo fica junto
+    if(a.grupo!==b.grupo) return (a.grupo||'').localeCompare(b.grupo||'');
+    // 2. Data de início (mais antiga primeiro). Vazios vão pro fim
+    const ai = a.inicio || '9999-12-31';
+    const bi = b.inicio || '9999-12-31';
+    if(ai!==bi) return ai.localeCompare(bi);
+    // 3. Fim previsto
+    const af = a.fim || '9999-12-31';
+    const bf = b.fim || '9999-12-31';
+    if(af!==bf) return af.localeCompare(bf);
+    // 4. Desempate estável por id
+    return (a.id||0)-(b.id||0);
+  });
+}
 const toast    = msg => { const el=document.getElementById('toast'); el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',2400); };
-const markDirty = () => state.dirty=true;
+const markDirty = () => { state.dirty = true; scheduleAutoPush(); };
 const getProject = () => state.projects[state.currentId];
 const getTask    = id => getProject()?.tasks.find(t=>t.id===id);
 
 // =============================================
-// STORAGE
+// STORAGE  (Firebase Realtime Database + localStorage cache/fallback)
 // =============================================
+const SYNC_INTERVAL_MS = 4000;   // pull cycle (fallback quando sem listener live)
+const PUSH_DEBOUNCE_MS = 700;    // push delay after edit
+
+let _remoteBroken = false;
+
+// Firebase keys não podem conter . # $ [ ] / — o id já é seguro (proj_xxx), mas sanitizamos por garantia
+const fbKey = id => String(id).replace(/[.#$\[\]\/]/g,'_');
+
 async function storageSave(id, data) {
   data.updatedAt = new Date().toISOString();
-  try {
-    if(window.storage) await window.storage.set('proj_'+id, JSON.stringify(data), true);
-    else localStorage.setItem('proj_'+id, JSON.stringify(data));
-  } catch(e){ console.warn('save error',e); }
+  data.version   = (data.version||0) + 1;
+  // Remove campos efêmeros antes de persistir
+  const clean = JSON.parse(JSON.stringify(data));
+  delete clean._saveStatus;
+
+  // 1) localStorage sempre primeiro (cache local instantâneo, nunca perde)
+  let localOk=false;
+  try { localStorage.setItem('proj_'+id, JSON.stringify(clean)); localOk=true; }
+  catch(e){ console.warn('localStorage save error', e); }
+
+  // 2) Firebase (compartilhado entre todos os usuários)
+  let remoteOk=false;
+  if(fbReady && fbDB && !_remoteBroken){
+    try {
+      await fbDB.ref('projects/'+fbKey(id)).set(clean);
+      remoteOk=true;
+    } catch(e){
+      console.warn('[Firebase] save falhou, usando local:', e?.message||e);
+      _remoteBroken=true; setTimeout(()=>{ _remoteBroken=false; }, 20000);
+    }
+  }
+
+  data._saveStatus = remoteOk ? 'remote' : (localOk ? 'local' : 'fail');
+  return data;
 }
+
 async function storageLoad(id) {
-  try {
-    if(window.storage){ const r=await window.storage.get('proj_'+id,true); return r?JSON.parse(r.value):null; }
-    else { const r=localStorage.getItem('proj_'+id); return r?JSON.parse(r):null; }
-  } catch(e){ return null; }
+  // Firebase primeiro (versão compartilhada mais atual)
+  if(fbReady && fbDB && !_remoteBroken){
+    try {
+      const snap = await fbDB.ref('projects/'+fbKey(id)).get();
+      if(snap.exists()){
+        const val = normalizeProject(snap.val());
+        // atualiza cache local
+        try { localStorage.setItem('proj_'+id, JSON.stringify(val)); }catch(e){}
+        return val;
+      }
+    } catch(e){
+      console.warn('[Firebase] load falhou, usando local:', e?.message||e);
+      _remoteBroken=true; setTimeout(()=>{ _remoteBroken=false; }, 20000);
+    }
+  }
+  // fallback localStorage
+  try { const r=localStorage.getItem('proj_'+id); return r?JSON.parse(r):null; }
+  catch(e){ return null; }
 }
+
 async function storageDelete(id) {
-  try {
-    if(window.storage) await window.storage.delete('proj_'+id,true);
-    else localStorage.removeItem('proj_'+id);
-  } catch(e){}
+  try { localStorage.removeItem('proj_'+id); } catch(e){}
+  if(fbReady && fbDB && !_remoteBroken){
+    try { await fbDB.ref('projects/'+fbKey(id)).remove(); } catch(e){}
+  }
 }
+
+// Listener em tempo real — chama callback sempre que o projeto muda no servidor
+let _liveRef = null;
+function subscribeLive(id, callback){
+  unsubscribeLive();
+  if(!(fbReady && fbDB)) return false;
+  try {
+    _liveRef = fbDB.ref('projects/'+fbKey(id));
+    _liveRef.on('value', snap=>{
+      if(snap.exists()) callback(snap.val());
+    });
+    return true;
+  } catch(e){ console.warn('[Firebase] subscribe falhou:', e?.message||e); return false; }
+}
+function unsubscribeLive(){
+  if(_liveRef){ try{ _liveRef.off(); }catch(e){} _liveRef=null; }
+}
+
 const hubList    = () => { try{ return JSON.parse(localStorage.getItem('dengo_hub')||'[]'); }catch(e){return[];} };
 const hubSave    = l => localStorage.setItem('dengo_hub',JSON.stringify(l));
 const hubAdd     = id => { const l=hubList(); if(!l.includes(id)){l.push(id);hubSave(l);} };
 const hubRemove  = id => hubSave(hubList().filter(x=>x!==id));
+
+// Compara duas versões: retorna true se "a" é mais recente que "b"
+function isNewer(a, b){
+  if(!b) return true;
+  if(!a) return false;
+  // version tem prioridade (mais confiável que timestamp em colaboração)
+  if(typeof a.version==='number' && typeof b.version==='number'){
+    if(a.version!==b.version) return a.version > b.version;
+  }
+  // empate de version: usa updatedAt
+  const ta = a.updatedAt||'';
+  const tb = b.updatedAt||'';
+  return ta > tb;
+}
+
+// Firebase remove arrays vazios e chaves undefined — restaura a forma esperada
+function normalizeProject(p){
+  if(!p || typeof p!=='object') return p;
+  if(!Array.isArray(p.tasks))    p.tasks = p.tasks ? Object.values(p.tasks) : [];
+  if(!Array.isArray(p.extraCols))p.extraCols = p.extraCols ? Object.values(p.extraCols) : [];
+  if(!p.groups || typeof p.groups!=='object') p.groups = {};
+  if(typeof p.nextId!=='number') p.nextId = (p.tasks.reduce((m,t)=>Math.max(m,t.id||0),0)||0)+1;
+  // cada tarefa precisa de extra:{} e campos mínimos
+  p.tasks.forEach(t=>{ if(!t.extra||typeof t.extra!=='object') t.extra={}; });
+  return p;
+}
 
 // =============================================
 // DEFAULT PROJECT DATA
@@ -544,8 +814,32 @@ async function init(){
   const list = hubList();
   if(!list.includes('dengo_mig_estoque_v2')){ list.unshift('dengo_mig_estoque_v2'); hubSave(list); }
   for(const id of list){
-    let p = id==='dengo_mig_estoque_v2' ? makeDefaultProject() : await storageLoad(id);
-    if(p){ state.projects[id]=p; await storageSave(id,p); }
+    // Carrega a versão salva (mais recente). Só usa o template default se nunca foi salvo.
+    let p = await storageLoad(id);
+    if(!p && id==='dengo_mig_estoque_v2'){
+      // Semeia o projeto Dengo apenas se NÃO existir no Firebase (evita sobrescrever dados do time)
+      p = makeDefaultProject();
+      if(fbReady && fbDB){
+        try {
+          // transação atômica: só grava se o nó ainda estiver vazio
+          const ref = fbDB.ref('projects/'+fbKey(id));
+          await ref.transaction(current => current===null ? p : undefined);
+          // recarrega o que ficou efetivamente no servidor (pode ser de outro usuário que semeou antes)
+          const reloaded = await storageLoad(id);
+          if(reloaded) p = reloaded;
+        } catch(e){
+          console.warn('[Firebase] seed falhou, usando local:', e?.message||e);
+          await storageSave(id, p);
+        }
+      } else {
+        await storageSave(id, p);
+      }
+    }
+    if(p){
+      normalizeProject(p);
+      sortTasks(p);
+      state.projects[id]=p;
+    }
   }
   document.getElementById('loading').style.display='none';
   showHub();
@@ -568,8 +862,10 @@ function bindStaticEvents(){
   document.getElementById('tb-xlsx').addEventListener('click', exportXLSX);
   document.getElementById('tb-present').addEventListener('click', startPresentation);
   document.getElementById('tb-share').addEventListener('click', shareProject);
+  document.getElementById('tb-diag').addEventListener('click', runFirebaseDiagnostic);
   document.getElementById('tb-pin').addEventListener('click', showPinModal);
   document.getElementById('tb-a11y').addEventListener('click', cycleColorblindMode);
+  document.getElementById('tb-reset-cols').addEventListener('click', resetAllColWidths);
   document.getElementById('tb-save').addEventListener('click', saveProject);
   document.getElementById('tb-del-proj').addEventListener('click', deleteCurrentProject);
   document.getElementById('tb-hub').addEventListener('click', goHub);
@@ -600,6 +896,26 @@ function bindStaticEvents(){
   document.getElementById('main-scroll').addEventListener('change', mainChangeDelegate);
   document.getElementById('main-scroll').addEventListener('input',  mainInputDelegate);
   document.getElementById('main-scroll').addEventListener('keydown',mainKeyDelegate);
+
+  // Salva edições pendentes ao fechar/atualizar a aba (síncrono via localStorage fallback)
+  window.addEventListener('beforeunload', ()=>{
+    if(state.currentId && state.dirty){
+      try{
+        const p = state.projects[state.currentId];
+        p.updatedAt = new Date().toISOString();
+        p.version = (p.version||0)+1;
+        // localStorage é síncrono, garante gravação antes de fechar
+        localStorage.setItem('proj_'+state.currentId, JSON.stringify(p));
+      }catch(e){}
+    }
+  });
+
+  // Ao voltar o foco para a aba, puxa a versão mais recente imediatamente
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible' && state.currentId && !state.dirty){
+      pullRemote();
+    }
+  });
 }
 
 // =============================================
@@ -649,9 +965,17 @@ function openProject(id){
   launchProject(id);
 }
 
-function launchProject(id){
+async function launchProject(id){
+  // Antes de abrir, busca a versão mais recente do storage (outro usuário pode ter editado)
+  const remote = await storageLoad(id);
+  if(remote && isNewer(remote, state.projects[id])){
+    state.projects[id] = remote;
+  }
   state.currentId=id;
   const p=state.projects[id];
+  sortTasks(p);
+  state.lastPulledVersion = p.version || 0;
+  state.dirty = false;
   document.getElementById('hub').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('tb-proj-name').textContent=p.name;
@@ -659,10 +983,15 @@ function launchProject(id){
   document.getElementById('chip-date').textContent='▶ '+new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   renderApp();
   startSync();
+  // Indica o estado real da conexão logo na abertura
+  if(fbReady) setSyncLabel('Sincronizado', false);
+  else setSyncLabel('Modo local', false);
 }
 
-function goHub(){
-  saveProject();
+async function goHub(){
+  // Garante que qualquer edição pendente seja salva antes de sair
+  clearTimeout(state.pushTimer);
+  if(state.dirty) await pushLocal();
   stopSync();
   state.currentId=null;
   showHub();
@@ -755,40 +1084,98 @@ function deleteColById(colId){
 }
 
 // =============================================
-// SYNC
+// SYNC — Firebase live + version-aware last-write-wins
 // =============================================
 function startSync(){
   stopSync();
-  state.lastHash='';
-  state.syncTimer=setInterval(async()=>{
-    if(!state.currentId) return;
-    if(state.dirty){
-      setSyncLabel('Salvando…',true);
-      await storageSave(state.currentId, state.projects[state.currentId]);
-      state.dirty=false; setSyncLabel('Sincronizado',false);
-    } else {
-      const remote=await storageLoad(state.currentId);
-      if(remote){
-        const h=JSON.stringify(remote).slice(0,80);
-        if(h!==state.lastHash && state.lastHash!==''){
-          state.projects[state.currentId]=remote; state.lastHash=h;
-          renderApp(); setSyncLabel('↻ Atualizado',true);
-          setTimeout(()=>setSyncLabel('Sincronizado',false),2000);
-        } else state.lastHash=h;
-      }
-    }
-  },5000);
+  state.lastPulledVersion = getProject()?.version || 0;
+
+  // 1) Listener em tempo real do Firebase — mudanças de outros usuários chegam na hora
+  const live = subscribeLive(state.currentId, remoteVal=>{
+    applyRemote(remoteVal);
+  });
+
+  // 2) Polling de segurança (cobre o caso de Firebase indisponível → localStorage entre abas)
+  //    Intervalo maior quando há listener live, menor quando é só localStorage
+  state.syncTimer = setInterval(pullRemote, live ? SYNC_INTERVAL_MS*3 : SYNC_INTERVAL_MS);
 }
-function stopSync(){ clearInterval(state.syncTimer); }
+function stopSync(){
+  clearInterval(state.syncTimer);
+  clearTimeout(state.pushTimer);
+  unsubscribeLive();
+}
 function setSyncLabel(txt,pulse){
   document.getElementById('sync-label').textContent=txt;
   document.getElementById('sync-dot').className='sync-dot'+(pulse?' pulse':'');
 }
+
+// Aplica uma versão remota recebida (do listener live ou do polling)
+function applyRemote(remote){
+  if(!remote || !state.currentId) return;
+  remote = normalizeProject(remote);
+  if(state.dirty) return; // não sobrescreve edição local pendente
+  const local = state.projects[state.currentId];
+  if(!isNewer(remote, local)) return; // só aplica se for genuinamente mais novo
+
+  // Preserva foco: se o usuário está digitando numa célula, adia
+  const active = document.activeElement;
+  const editing = active && (active.tagName==='INPUT'||active.tagName==='SELECT'||active.tagName==='TEXTAREA') && active.closest('#main-scroll');
+  if(editing) return;
+
+  state.projects[state.currentId] = remote;
+  state.lastPulledVersion = remote.version || 0;
+  sortTasks(remote);
+  renderApp();
+  setSyncLabel('↻ Atualizado', true);
+  setTimeout(()=>setSyncLabel('Sincronizado', false), 1800);
+}
+
+// Agenda um push com debounce (chamado por markDirty em toda edição)
+function scheduleAutoPush(){
+  if(!state.currentId) return;
+  setSyncLabel('Editando…', true);
+  clearTimeout(state.pushTimer);
+  state.pushTimer = setTimeout(pushLocal, PUSH_DEBOUNCE_MS);
+}
+
+// Envia o estado local para o storage
+async function pushLocal(){
+  if(!state.currentId || !state.dirty) return;
+  const p = state.projects[state.currentId];
+  if(!p) return;
+  setSyncLabel('Salvando…', true);
+  const saved = await storageSave(state.currentId, p); // incrementa version + updatedAt
+  if(saved){
+    state.lastPulledVersion = saved.version;
+    state.dirty = false;
+    if(saved._saveStatus === 'remote') setSyncLabel('Sincronizado', false);
+    else if(saved._saveStatus === 'local') setSyncLabel('Salvo local', false);
+    else setSyncLabel('⚠ Erro ao salvar', false);
+  } else {
+    setSyncLabel('⚠ Erro ao salvar', false);
+  }
+}
+
+// Busca a versão remota via fetch pontual (polling de segurança)
+async function pullRemote(){
+  if(!state.currentId) return;
+  if(state.dirty){ await pushLocal(); return; }
+  const remote = await storageLoad(state.currentId);
+  applyRemote(remote);
+}
+
+// Salvar manual (botão 💾) — força push imediato
 async function saveProject(){
   if(!state.currentId) return;
-  setSyncLabel('Salvando…',true);
-  await storageSave(state.currentId, state.projects[state.currentId]);
-  state.dirty=false; setSyncLabel('Sincronizado',false); toast('Salvo!');
+  clearTimeout(state.pushTimer);
+  const p = state.projects[state.currentId];
+  setSyncLabel('Salvando…', true);
+  const saved = await storageSave(state.currentId, p);
+  if(saved) state.lastPulledVersion = saved.version;
+  state.dirty = false;
+  if(saved && saved._saveStatus === 'remote'){ setSyncLabel('Sincronizado', false); toast('Salvo e sincronizado!'); }
+  else if(saved && saved._saveStatus === 'local'){ setSyncLabel('Salvo local', false); toast('Salvo localmente neste navegador.'); }
+  else { setSyncLabel('⚠ Erro ao salvar', false); toast('Erro ao salvar. Tente novamente.'); }
 }
 
 // =============================================
@@ -881,6 +1268,8 @@ function renderGroups(){
   cont.innerHTML=''; state.groupMap={};
 
   const allTasks=p.tasks;
+  // Garante ordenação canônica (grupo → início → fim → id) antes de qualquer render
+  sortTasks(p);
   const {start,end}=getGanttRange(allTasks);
   const days=getDays(start,end); const months=groupByMonth(days);
 
@@ -896,7 +1285,7 @@ function renderGroups(){
   for(const gname in p.groups){
     if(state.groupFilter!=='all'&&state.groupFilter!==gname) continue;
     const gc=p.groups[gname].color;
-    const tasks=allTasks.filter(t=>t.grupo===gname).sort((a,b)=>(a.inicio||'').localeCompare(b.inicio||''));
+    const tasks=allTasks.filter(t=>t.grupo===gname); // já ordenado por sortTasks(p)
     const filtered=getFilteredTasks(tasks);
     const total=tasks.length, done=tasks.filter(t=>t.status==='REALIZADO').length;
     const late=tasks.filter(t=>isLate(t)).length;
@@ -924,12 +1313,13 @@ function renderGroups(){
     // TABLE
     const bodyDiv=document.createElement('div'); bodyDiv.className='group-body';
     const table=document.createElement('table'); table.className='gantt-table';
+    table.dataset.tableId = tableIdFor(gname);
     const fixedCols=13+(p.extraCols||[]).length;
     let mHtml=`<tr class="row-month"><th colspan="${fixedCols}" style="min-width:1116px"></th>`;
     months.forEach(m=>mHtml+=`<th colspan="${m.count}">${m.label}</th>`);
     mHtml+='</tr>';
-    let hHtml='<tr class="row-fixed"><th class="col-task">TAREFA</th><th class="col-prio">!</th><th class="col-status">STATUS</th><th class="col-date">INÍCIO</th><th class="col-date">FIM PREV.</th><th class="col-date">CONCLUSÃO</th><th class="col-days">DIAS</th><th class="col-pct">%</th><th class="col-resp th-resp">👤 RESP.</th><th class="col-obs th-obs">📝 OBS.</th><th class="col-alert th-alert">⚠ ATRASO</th><th class="col-delayresp th-delayresp">RESP. ATRASO</th><th class="col-del">DEL</th>';
-    (p.extraCols||[]).forEach(ec=>hHtml+=`<th style="width:${ec.width}px;min-width:${ec.width}px;border-left:2px solid rgba(72,49,27,.2);color:var(--brown);font-size:8px;padding:4px 6px;">${esc(ec.name)} <button class="group-btn group-del-btn" style="padding:1px 4px;font-size:9px;" data-del-col="${ec.id}">✕</button></th>`);
+    let hHtml='<tr class="row-fixed"><th class="col-task" data-col-key="task">TAREFA</th><th class="col-prio" data-col-key="prio">!</th><th class="col-status" data-col-key="status">STATUS</th><th class="col-date" data-col-key="inicio">INÍCIO</th><th class="col-date" data-col-key="fim">FIM PREV.</th><th class="col-date" data-col-key="conc">CONCLUSÃO</th><th class="col-days" data-col-key="days">DIAS</th><th class="col-pct" data-col-key="pct">%</th><th class="col-resp th-resp" data-col-key="resp">👤 RESP.</th><th class="col-obs th-obs" data-col-key="obs">📝 OBS.</th><th class="col-alert th-alert" data-col-key="alert">⚠ ATRASO</th><th class="col-delayresp th-delayresp" data-col-key="delayresp">RESP. ATRASO</th><th class="col-del" data-col-key="del">DEL</th>';
+    (p.extraCols||[]).forEach(ec=>hHtml+=`<th data-col-key="extra:${ec.id}" style="width:${ec.width}px;min-width:60px;border-left:2px solid rgba(72,49,27,.2);color:var(--brown);font-size:8px;padding:4px 6px;position:relative;">${esc(ec.name)} <button class="group-btn group-del-btn" style="padding:1px 4px;font-size:9px;" data-del-col="${ec.id}">✕</button></th>`);
     days.forEach(d=>{
       const ds=d.toISOString().slice(0,10);
       hHtml+=`<th class="cal-day-h${ds===todayStr?' today-h':''}${(d.getDay()===0||d.getDay()===6)?' weekend':''}">${d.getDate()}</th>`;
@@ -946,6 +1336,10 @@ function renderGroups(){
     foot.appendChild(qa); block.appendChild(foot);
     cont.appendChild(block);
   }
+
+  // Apply user-defined column widths and install resize handles
+  applyColWidths();
+  installResizers();
 }
 
 // =============================================
@@ -982,8 +1376,8 @@ function makeTaskRow(t, days, gc, p){
   let extra='';
   (p.extraCols||[]).forEach(ec=>{
     const v=t.extra&&t.extra[ec.id]!=null?t.extra[ec.id]:'';
-    if(ec.type==='check') extra+=`<td style="text-align:center;padding:4px;width:${ec.width}px"><input type="checkbox" style="width:14px;height:14px" ${v?'checked':''} data-extra-tid="${t.id}" data-extra-col="${ec.id}" data-extra-type="check"></td>`;
-    else extra+=`<td style="padding:2px 4px;width:${ec.width}px"><input type="${ec.type==='number'?'number':ec.type==='date'?'date':'text'}" value="${esc(String(v))}" data-extra-tid="${t.id}" data-extra-col="${ec.id}" style="border:none;background:transparent;font-size:10px;outline:none;width:100%;"></td>`;
+    if(ec.type==='check') extra+=`<td data-col-key="extra:${ec.id}" style="text-align:center;padding:4px;width:${ec.width}px"><input type="checkbox" style="width:14px;height:14px" ${v?'checked':''} data-extra-tid="${t.id}" data-extra-col="${ec.id}" data-extra-type="check"></td>`;
+    else extra+=`<td data-col-key="extra:${ec.id}" style="padding:2px 4px;width:${ec.width}px"><input type="${ec.type==='number'?'number':ec.type==='date'?'date':'text'}" value="${esc(String(v))}" data-extra-tid="${t.id}" data-extra-col="${ec.id}" style="border:none;background:transparent;font-size:10px;outline:none;width:100%;"></td>`;
   });
 
   let calCells='';
@@ -993,24 +1387,24 @@ function makeTaskRow(t, days, gc, p){
   });
 
   tr.innerHTML=`
-    <td class="cell-task"><input class="task-name-inp" value="${esc(t.tarefa)}" data-tid="${t.id}" data-field="tarefa">${late?'<span class="badge-late">ATRASADA</span>':''}</td>
-    <td class="cell-prio"><span class="prio-dot" style="background:${PRIO_COLORS[t.prio]||PRIO_COLORS['']}" data-prio-tid="${t.id}" title="${t.prio||'Sem prioridade'}"></span></td>
-    <td class="cell-status"><select class="status-sel ${sc}" data-tid="${t.id}" data-field="status">
+    <td class="cell-task" data-col-key="task"><input class="task-name-inp" value="${esc(t.tarefa)}" data-tid="${t.id}" data-field="tarefa">${late?'<span class="badge-late">ATRASADA</span>':''}</td>
+    <td class="cell-prio" data-col-key="prio"><span class="prio-dot" style="background:${PRIO_COLORS[t.prio]||PRIO_COLORS['']}" data-prio-tid="${t.id}" title="${t.prio||'Sem prioridade'}"></span></td>
+    <td class="cell-status" data-col-key="status"><select class="status-sel ${sc}" data-tid="${t.id}" data-field="status">
       <option value="NÃO INICIADO" ${t.status==='NÃO INICIADO'?'selected':''}>NÃO INICIADO</option>
       <option value="EM ANDAMENTO" ${t.status==='EM ANDAMENTO'?'selected':''}>EM ANDAMENTO</option>
       <option value="REALIZADO"    ${t.status==='REALIZADO'?'selected':''}>REALIZADO</option>
       <option value="BLOQUEADO"    ${t.status==='BLOQUEADO'?'selected':''}>BLOQUEADO</option>
     </select></td>
-    <td class="cell-date" data-float-tid="${t.id}" data-float-field="inicio"><span class="date-display${t.inicio?'':' empty'}"><span>${t.inicio?fmtDate(t.inicio):'dd/mm'}</span><span class="cal-icon">🗓</span></span></td>
-    <td class="cell-date" data-float-tid="${t.id}" data-float-field="fim"><span class="date-display${t.fim?'':' empty'}"><span>${t.fim?fmtDate(t.fim):'dd/mm'}</span><span class="cal-icon">🗓</span></span></td>
-    <td class="cell-date" data-float-tid="${t.id}" data-float-field="conc"><span class="date-display${t.conc?' conc-filled':''}${t.conc?'':' empty'}"><span>${t.conc?fmtDate(t.conc):'dd/mm'}</span><span class="cal-icon">🗓</span></span></td>
-    <td class="cell-days"><input class="days-inp" type="number" value="${dn}" min="0" data-tid="${t.id}"></td>
-    <td class="cell-pct"><div class="pct-bar"><div class="pct-fill" style="width:${t.pct}%;background:${pc}"></div></div><input class="pct-inp" type="number" value="${t.pct}" min="0" max="100" data-tid="${t.id}" data-field="pct"></td>
-    <td class="cell-resp" data-float-tid="${t.id}" data-float-field="resp">${t.resp?`<span class="chip-pill">${esc(t.resp)}</span>`:'<span class="chip-assign">+ Atribuir</span>'}</td>
-    <td class="cell-obs"  data-float-tid="${t.id}" data-float-field="obs">${t.obs?`<span class="obs-text">${esc(t.obs.slice(0,60))}</span>`:'<span class="obs-add">+ Nota</span>'}</td>
-    <td class="cell-alert">${renderAlertCell(t)}</td>
-    <td class="cell-delayresp">${renderDelayRespCell(t)}</td>
-    <td class="cell-del"><button class="btn-del" data-del-tid="${t.id}">✕</button></td>
+    <td class="cell-date" data-col-key="inicio" data-float-tid="${t.id}" data-float-field="inicio"><span class="date-display${t.inicio?'':' empty'}"><span>${t.inicio?fmtDate(t.inicio):'dd/mm'}</span><span class="cal-icon">🗓</span></span></td>
+    <td class="cell-date" data-col-key="fim" data-float-tid="${t.id}" data-float-field="fim"><span class="date-display${t.fim?'':' empty'}"><span>${t.fim?fmtDate(t.fim):'dd/mm'}</span><span class="cal-icon">🗓</span></span></td>
+    <td class="cell-date" data-col-key="conc" data-float-tid="${t.id}" data-float-field="conc"><span class="date-display${t.conc?' conc-filled':''}${t.conc?'':' empty'}"><span>${t.conc?fmtDate(t.conc):'dd/mm'}</span><span class="cal-icon">🗓</span></span></td>
+    <td class="cell-days" data-col-key="days"><input class="days-inp" type="number" value="${dn}" min="0" data-tid="${t.id}"></td>
+    <td class="cell-pct" data-col-key="pct"><div class="pct-bar"><div class="pct-fill" style="width:${t.pct}%;background:${pc}"></div></div><input class="pct-inp" type="number" value="${t.pct}" min="0" max="100" data-tid="${t.id}" data-field="pct"></td>
+    <td class="cell-resp" data-col-key="resp" data-float-tid="${t.id}" data-float-field="resp">${t.resp?`<span class="chip-pill">${esc(t.resp)}</span>`:'<span class="chip-assign">+ Atribuir</span>'}</td>
+    <td class="cell-obs"  data-col-key="obs" data-float-tid="${t.id}" data-float-field="obs">${t.obs?`<span class="obs-text">${esc(t.obs.slice(0,60))}</span>`:'<span class="obs-add">+ Nota</span>'}</td>
+    <td class="cell-alert" data-col-key="alert">${renderAlertCell(t)}</td>
+    <td class="cell-delayresp" data-col-key="delayresp">${renderDelayRespCell(t)}</td>
+    <td class="cell-del" data-col-key="del"><button class="btn-del" data-del-tid="${t.id}">✕</button></td>
     ${extra}${calCells}`;
 
   // Gantt bar — barra principal (previsto) + extensão vermelha quando concluído com atraso
@@ -1148,12 +1542,9 @@ function mainInputDelegate(e){
     const t=getTask(parseInt(e.target.dataset.tid)); if(!t||!t.inicio) return;
     t.fim=addDays(t.inicio,parseInt(e.target.value)||0);
     markDirty();
-    // update fim display
-    const row=e.target.closest('tr');
-    if(row){
-      const cell=row.querySelectorAll('.cell-date')[1];
-      if(cell){ const sp=cell.querySelector('.date-display span'); if(sp) sp.textContent=fmtDate(t.fim); cell.querySelector('.date-display')?.classList.remove('empty'); }
-    }
+    // re-render to keep order + recompute alert column
+    const p=getProject(); if(p) sortTasks(p);
+    renderApp();
     return;
   }
 }
@@ -1166,6 +1557,7 @@ function mainKeyDelegate(e){
     const name=e.target.value.trim(); if(!name) return;
     const gname=e.target.dataset.qaGroup; const p=getProject(); if(!p) return;
     p.tasks.push({id:p.nextId++,grupo:gname,prio:'',tarefa:name.toUpperCase(),inicio:todayStr,fim:todayStr,conc:'',status:'NÃO INICIADO',pct:0,resp:'',obs:'',extra:{}});
+    sortTasks(p);
     e.target.value=''; markDirty(); renderApp();
   }
 }
@@ -1242,7 +1634,16 @@ function confirmFloat(){
   const t=getTask(state.floatTaskId); if(!t) return;
   const isDate=DATE_FIELDS.includes(state.floatField);
   const val=isDate?document.getElementById('fe-date').value:document.getElementById('fe-text').value;
+  const prevVal=t[state.floatField];
   t[state.floatField]=val; markDirty();
+
+  // Datas de início/fim alteram a ordem visual — re-render completo
+  if(isDate && (state.floatField==='inicio' || state.floatField==='fim') && prevVal!==val){
+    const p=getProject(); if(p) sortTasks(p);
+    closeFloat();
+    renderApp();
+    return;
+  }
 
   // Update cell without full re-render
   const row=document.querySelector(`tr[data-tid="${state.floatTaskId}"]`);
@@ -1350,6 +1751,7 @@ function showNewTaskModal(pregroup){
     const name=document.getElementById('nt-name').value.trim().toUpperCase();
     if(!name){toast('Nome obrigatório.');return;}
     p.tasks.push({id:p.nextId++,grupo:document.getElementById('nt-group').value,prio:document.getElementById('nt-prio').value,tarefa:name,inicio:document.getElementById('nt-ini').value,fim:document.getElementById('nt-fim').value,conc:'',status:'NÃO INICIADO',pct:0,resp:document.getElementById('nt-resp').value,obs:document.getElementById('nt-obs').value,extra:{}});
+    sortTasks(p);
     markDirty(); closeTopModal(); renderApp(); toast('Tarefa criada!');
   });
 }
@@ -1430,6 +1832,91 @@ function showNewProjectModal(){
 
 // SHARE
 function shareProject(){ const p=getProject(); if(!p) return; navigator.clipboard.writeText(p.id).catch(()=>{}); toast('ID copiado: '+p.id); }
+
+// ===== Diagnóstico de conexão Firebase =====
+async function runFirebaseDiagnostic(){
+  const lines = [];
+  const ok = (s)=>`<span style="color:var(--done);font-weight:500">✅ ${s}</span>`;
+  const bad= (s)=>`<span style="color:var(--red-d);font-weight:500">❌ ${s}</span>`;
+  const warn=(s)=>`<span style="color:#8A5A00;font-weight:500">⚠ ${s}</span>`;
+
+  // 1. SDK carregou?
+  if(typeof firebase === 'undefined'){
+    lines.push(bad('SDK do Firebase NÃO carregou'));
+    lines.push(`<span style="font-size:11px;color:var(--muted)">O ambiente bloqueou o script de gstatic.com. Isso é normal no preview do Claude — <b>no GitHub Pages funciona</b>.</span>`);
+  } else {
+    lines.push(ok('SDK do Firebase carregado'));
+  }
+
+  // 2. Inicializou?
+  if(!fbReady){
+    initFirebase(); // tenta de novo
+  }
+  if(fbReady && fbDB){
+    lines.push(ok('Conexão inicializada'));
+    lines.push(`<span style="font-size:11px;color:var(--muted)">Banco: ${firebaseConfig.databaseURL}</span>`);
+
+    // 3. Teste de ESCRITA real
+    const testKey = '_diag_test';
+    const testVal = { ts: Date.now(), by: 'diag' };
+    let writeOk=false, readOk=false, writeErr='', readErr='';
+    try {
+      await fbDB.ref(testKey).set(testVal);
+      writeOk=true;
+    } catch(e){ writeErr = e?.message||String(e); }
+
+    if(writeOk){
+      lines.push(ok('ESCRITA funcionou'));
+      // 4. Teste de LEITURA real
+      try {
+        const snap = await fbDB.ref(testKey).get();
+        if(snap.exists() && snap.val().ts===testVal.ts){ readOk=true; }
+      } catch(e){ readErr = e?.message||String(e); }
+
+      if(readOk){
+        lines.push(ok('LEITURA funcionou'));
+        lines.push(`<span style="color:var(--done);font-weight:500;font-size:13px">🎉 Firebase 100% operacional! O time vê tudo em tempo real.</span>`);
+        // limpa o nó de teste
+        try { await fbDB.ref(testKey).remove(); } catch(e){}
+      } else {
+        lines.push(bad('LEITURA falhou'));
+        if(readErr) lines.push(`<span style="font-size:11px;color:var(--red-d)">${esc(readErr)}</span>`);
+      }
+    } else {
+      lines.push(bad('ESCRITA bloqueada'));
+      if(writeErr) lines.push(`<span style="font-size:11px;color:var(--red-d)">${esc(writeErr)}</span>`);
+      if(/permission_denied|PERMISSION_DENIED/i.test(writeErr)){
+        lines.push(`<span style="font-size:12px;color:#8A5A00;font-weight:500">→ As REGRAS do Firebase estão trancadas. Veja a correção abaixo.</span>`);
+      }
+    }
+  } else {
+    lines.push(bad('Conexão NÃO inicializada'));
+    if(fbError) lines.push(`<span style="font-size:11px;color:var(--red-d)">${esc(fbError)}</span>`);
+    lines.push(warn('App rodando em modo localStorage (dados só neste navegador)'));
+  }
+
+  // Instruções de regras
+  const rulesBlock = `<div style="margin-top:14px;padding:12px;background:var(--s2);border-radius:8px;font-size:11px;line-height:1.5">
+    <b style="font-size:12px">Se a escrita estiver bloqueada</b>, abra o Console Firebase → projeto <b>gannt-efeed</b> → <b>Realtime Database → Regras</b> e cole:
+    <pre style="background:var(--bg);padding:8px;border-radius:6px;margin-top:6px;overflow-x:auto;font-size:10px">{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</pre>
+    Depois clique em <b>Publicar</b> e teste de novo aqui.
+  </div>`;
+
+  openModal(`<div class="modal-title">🔌 Diagnóstico Firebase</div>
+    <div style="display:flex;flex-direction:column;gap:7px">${lines.join('')}</div>
+    ${rulesBlock}
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeTopModal()">Fechar</button>
+      <button class="btn btn-primary" id="diag-retry">↻ Testar de novo</button>
+    </div>`);
+  const retry=document.getElementById('diag-retry');
+  if(retry) retry.addEventListener('click', ()=>{ closeTopModal(); runFirebaseDiagnostic(); });
+}
 
 // PIN
 function showPinUnlockModal(projectId){
@@ -1640,7 +2127,7 @@ function startPresentation(){
   const upcoming=p.tasks.filter(t=>t.status!=='REALIZADO').sort((a,b)=>(a.fim||'').localeCompare(b.fim||'')).slice(0,8);
   const upRows=upcoming.map((t,i)=>{
     const dl=t.fim?Math.round((new Date(t.fim)-TODAY)/86400000):999;
-    const pill=isLate(t)?`<span class="final-pill" style="background:rgba(233,92,36,.15);color:var(--blok)">ATRASADA</span>`:dl===0?`<span class="final-pill" style="background:rgba(255,210,0,.25);color:var(--brown)">HOJE</span>`:`<span class="final-pill" style="background:var(--s2);color:var(--muted)">${dl}d</span>`;
+    const pill=isLate(t)?`<span class="final-pill" style="background:rgba(233,92,36,.15);color:var(--blok)">ATRASADA</span>`:dl===0?`<span class="final-pill" style="background:rgba(244,197,0,.25);color:var(--brown)">HOJE</span>`:`<span class="final-pill" style="background:var(--s2);color:var(--muted)">${dl}d</span>`;
     return `<div class="slide-row"><span class="final-num">${String(i+1).padStart(2,'0')}</span><span class="slide-name">${esc(t.tarefa)}</span><span style="font-size:11px;font-weight:500;color:${p.groups[t.grupo]?.color||'var(--accent)'}">${esc(t.grupo)}</span><span style="font-size:11px;color:var(--muted)">${fmtDate(t.fim)}</span>${pill}</div>`;
   }).join('');
   addSlide(`<div class="slide-label">Próximas Ações</div><div style="font-size:22px;font-weight:600;margin-bottom:20px">Top tarefas em aberto</div>${upRows||'<div style="color:var(--muted)">Tudo concluído! 🎉</div>'}`);
